@@ -1,0 +1,32 @@
+steps:
+
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+    - 'build'
+    - '-t'
+    - 'us-central1-docker.pkg.dev/$PROJECT_ID/techpay-repo/credit-api:$SHORT_SHA'
+    - '.'
+
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+    - 'push'
+    - 'us-central1-docker.pkg.dev/$PROJECT_ID/techpay-repo/credit-api:$SHORT_SHA'
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args:
+    - 'run'
+    - 'deploy'
+    - 'credit-api'
+    - '--image=us-central1-docker.pkg.dev/$PROJECT_ID/techpay-repo/credit-api:$SHORT_SHA'
+    - '--region=us-central1'
+    - '--service-account=sa-credit-api@$PROJECT_ID.iam.gserviceaccount.com'
+    - '--update-secrets=CREDIT_API_KEY=CREDIT_API_KEY:latest'
+    - '--set-env-vars=REVISION_TAG=$SHORT_SHA'
+    - '--vpc-connector=techpay-connector'
+    - '--vpc-egress=all-traffic'
+    - '--min-instances=1'
+    - '--no-allow-unauthenticated'
+
+images:
+- 'us-central1-docker.pkg.dev/$PROJECT_ID/techpay-repo/credit-api:$SHORT_SHA'
