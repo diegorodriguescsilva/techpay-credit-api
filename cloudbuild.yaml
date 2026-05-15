@@ -1,32 +1,43 @@
 steps:
+  # Step 1: Build da imagem com tag do commit
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/credit-api:${SHORT_SHA}"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/credit-api:latest"
+      - "."
 
-- name: 'gcr.io/cloud-builders/docker'
-  args:
-    - 'build'
-    - '-t'
-    - 'us-central1-docker.pkg.dev/$PROJECT_ID/techpay-repo/credit-api:$SHORT_SHA'
-    - '.'
+  # Step 2: Push para o Artifact Registry
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "--all-tags"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/credit-api"
 
-- name: 'gcr.io/cloud-builders/docker'
-  args:
-    - 'push'
-    - 'us-central1-docker.pkg.dev/$PROJECT_ID/techpay-repo/credit-api:$SHORT_SHA'
+  # Step 3: Deploy no Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "credit-api"
+      - "--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/credit-api:${SHORT_SHA}"
+      - "--region=${_REGION}"
+      - "--service-account=sa-credit-api@${PROJECT_ID}.iam.gserviceaccount.com"
+      - "--update-secrets=CREDIT_API_KEY=CREDIT_API_KEY:latest"
+      - "--vpc-connector=${_VPC_CONNECTOR}"
+      - "--vpc-egress=all-traffic"
+      - "--min-instances=1"
+      - "--no-allow-unauthenticated"
+      - "--set-env-vars=REVISION_TAG=${SHORT_SHA}"
+      - "--platform=managed"
 
-- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  entrypoint: gcloud
-  args:
-    - 'run'
-    - 'deploy'
-    - 'credit-api'
-    - '--image=us-central1-docker.pkg.dev/$PROJECT_ID/techpay-repo/credit-api:$SHORT_SHA'
-    - '--region=us-central1'
-    - '--service-account=sa-credit-api@$PROJECT_ID.iam.gserviceaccount.com'
-    - '--update-secrets=CREDIT_API_KEY=CREDIT_API_KEY:latest'
-    - '--set-env-vars=REVISION_TAG=$SHORT_SHA'
-    - '--vpc-connector=techpay-connector'
-    - '--vpc-egress=all-traffic'
-    - '--min-instances=1'
-    - '--no-allow-unauthenticated'
+substitutions:
+  _REGION: "us-central1"
+  _REPO_NAME: "techpay-repo"
+  _VPC_CONNECTOR: "vpc-connector-techpay"
 
-images:
-- 'us-central1-docker.pkg.dev/$PROJECT_ID/techpay-repo/credit-api:$SHORT_SHA'
+options:
+  logging: CLOUD_LOGGING_ONLY  # ← isso resolve o erro
